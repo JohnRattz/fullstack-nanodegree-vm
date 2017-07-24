@@ -46,9 +46,11 @@ class WebserverHandler(BaseHTTPRequestHandler):
                 myRestaurantQuery = session.query(Restaurant) \
                     .filter_by(id=restaurantID).one()
                 if myRestaurantQuery != []:
+                    # Send response headers.
                     self.send_response(200)
                     self.send_header('Content-type', 'text/html')
                     self.end_headers()
+                    # Create the form.
                     output = ""
                     output += "<html><body>"
                     output += "<h1>%s</h1>" % myRestaurantQuery.name
@@ -58,8 +60,33 @@ class WebserverHandler(BaseHTTPRequestHandler):
                               "placeholder='%s'>" % myRestaurantQuery.name
                     output += "<input type='submit' value='Rename'>" \
                               "</form>"
+                    output += "</body></html>"
                     self.wfile.write(output)
-                    return
+                return
+            # Provide a form for deleting a restaurant.
+            if self.path.endswith("/delete"):
+                # Retrieve the restaurant ID from the path.
+                restaurantID = self.path.split("/")[2]
+                # Issue a query to retrieve the restaurant.
+                myRestaurantQuery = session.query(Restaurant) \
+                    .filter_by(id=restaurantID).one()
+                if myRestaurantQuery != []:
+                    # Send response headers.
+                    self.send_response(200)
+                    self.send_header('Content-type', 'text/html')
+                    self.end_headers()
+                    # Create the form.
+                    output = ""
+                    output += "<html><body>"
+                    output += "<h1>Are you sure you want to delete %s?</h1>" % myRestaurantQuery.name
+                    # TODO: Can this form have a different `enctype`?
+                    output += "<form method='POST' " \
+                              "enctype='multipart/form-data' action='/restaurants/%s/delete'>" % restaurantID
+                    output += "<input type='submit' value='Delete'>" \
+                              "</form>"
+                    output += "</body></html>"
+                    self.wfile.write(output)
+                return
             # Print all restaurant names on the "/restaurants" page
             if self.path.endswith("/restaurants"):
                 # Retrieve all restaurants in the database.
@@ -78,10 +105,9 @@ class WebserverHandler(BaseHTTPRequestHandler):
                     output += restaurant.name
                     output += "</br>"
                     # Add links for editing and deleting elements.
-                    # TODO: Make these link to appropriate pages.
                     output += "<a href='restaurants/%s/edit'>Edit</a>" % restaurant.id
                     output += "</br>"
-                    output += "<a href='#'>Delete</a>"
+                    output += "<a href='restaurants/%s/delete'>Delete</a>" % restaurant.id
                     output += "</br></br>"
                 output += "</body></html>"
                 self.wfile.write(output)
@@ -105,7 +131,6 @@ class WebserverHandler(BaseHTTPRequestHandler):
                           "</form>"
                 output += "</body></html>"
                 self.wfile.write(output)
-                print("Output string: %s" % output)
                 return
             if self.path.endswith("/hola"):
                 # This is a successful GET request.
@@ -126,13 +151,13 @@ class WebserverHandler(BaseHTTPRequestHandler):
                           "</form>"
                 output += "</body></html>"
                 self.wfile.write(output)
-                print("Output string: %s" % output)
                 return
         except IOError:
             self.send_error(404, "File Not Found: %s" % self.path)
 
     def do_POST(self):
         try:
+            # Handle edits to restaurant names.
             if self.path.endswith("/edit"):
                 ctype, pdict = cgi.parse_header(
                     self.headers.getheader('content-type'))
@@ -155,6 +180,30 @@ class WebserverHandler(BaseHTTPRequestHandler):
                         # Redirect to the restaurants list page.
                         self.send_header('Location', '/restaurants')
                         self.end_headers()
+                return
+            # Handle restaurant deletions.
+            if self.path.endswith("/delete"):
+                # TODO: Remove these commented lines of code if unneeded.
+                # ctype, pdict = cgi.parse_header(
+                #     self.headers.getheader('content-type'))
+                # if ctype == 'multipart/form-data':
+                # Retrieve the restaurant ID from the path.
+                restaurantID = self.path.split("/")[2]
+                # Issue a query to retrieve the restaurant.
+                myRestaurantQuery = session.query(Restaurant) \
+                    .filter_by(id=restaurantID).one()
+                if myRestaurantQuery != []:
+                    # Delete this restaurant.
+                    session.delete(myRestaurantQuery)
+                    session.commit()
+                    # HTTP Headers
+                    self.send_response(301)
+                    self.send_header('Content-type', 'text/html')
+                    # Redirect to the restaurants list page.
+                    self.send_header('Location', '/restaurants')
+                    self.end_headers()
+                return
+            # Handle restaurant creations.
             if self.path.endswith("restaurants/new"):
                 ctype, pdict = cgi.parse_header(
                     self.headers.getheader('content-type'))
